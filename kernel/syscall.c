@@ -101,6 +101,10 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
+extern uint64 sys_peterson_create(void);
+extern uint64 sys_peterson_acquire(void);
+extern uint64 sys_peterson_release(void);
+extern uint64 sys_peterson_destroy(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -145,3 +149,6 @@ syscall(void)
     p->trapframe->a0 = -1;
   }
 }
+
+
+

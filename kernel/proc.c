@@ -10,10 +10,14 @@ struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
 
+struct peterson_lock sync_lock[15];
+
 struct proc *initproc;
 
 int nextpid = 1;
+int nextlockid = 1;
 struct spinlock pid_lock;
+struct spinlock lockid_lock;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
@@ -680,4 +684,31 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+int peterson_create(void){ //how to init a lock?
+  int lock_id;
+  
+  acquire(&lockid_lock);
+  lock_id = nextlockid;
+  nextlockid = nextlockid + 1;
+  release(&lockid_lock);
+
+  return lock_id;
+}
+
+int peterson_acquire(int lock_id, int role){
+  peterson_lock* lock= &sync_lock[lock_id];
+  lock->b[role]=1;
+  lock->turn=role;
+  await (lock->b[1-role]=0 || lock->turn=1-role);
+}
+
+int peterson_release(int lock_id, int role){
+  peterson_lock* lock= &sync_lock[lock_id];
+  lock->b[role]=0;
+}
+
+int peterson_destroy(int lock_id){
+
 }

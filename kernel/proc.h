@@ -105,3 +105,9 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 };
+
+typedef struct peterson_lock peterson_lock{
+  int lockid;
+  uint turn;
+  uint b[2];
+};

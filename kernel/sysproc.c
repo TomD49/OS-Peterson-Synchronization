@@ -89,3 +89,27 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_peterson_create(void)
+{
+  return peterson_create();
+}
+
+uint64
+sys_peterson_acquire(void)
+{
+  return peterson_acquire();
+}
+
+uint64
+sys_peterson_release(void)
+{
+  return peterson_release();
+}
+
+uint64
+sys_peterson_destroy(void)
+{
+  return peterson_destroy();
+}
