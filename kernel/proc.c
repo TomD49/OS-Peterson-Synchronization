@@ -10,12 +10,12 @@ struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
 
-struct peterson_lock sync_lock[15];
+struct peterson_lock sync_lock[NLOCKS];
 
 struct proc *initproc;
 
 int nextpid = 1;
-int nextlockid = 1;
+int nextlockid = 0;
 struct spinlock pid_lock;
 struct spinlock lockid_lock;
 
@@ -59,6 +59,23 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+  }
+}
+
+// initialize the peterson locks.
+void
+initPetersonLocks(void)
+{
+  int i = 0;
+  struct peterson_lock *plock = sync_lock;
+
+  for (i = 0; i < NLOCKS; i++) {
+    plock->turn = 0;
+    plock->active = 0;
+    plock->b[0] = 0;
+    plock->b[1] = 0;
+    plock->lockid = i;
+    plock++;
   }
 }
 
@@ -691,6 +708,11 @@ int peterson_create(void){ //how to init a lock?
   
   acquire(&lockid_lock);
   lock_id = nextlockid;
+  sync_lock[lock_id].active = 1;
+  if (lock_id >= NLOCKS) {
+    release(&lockid_lock);
+    return -1; // No more locks available
+  }
   nextlockid = nextlockid + 1;
   release(&lockid_lock);
 
@@ -698,14 +720,14 @@ int peterson_create(void){ //how to init a lock?
 }
 
 int peterson_acquire(int lock_id, int role){
-  peterson_lock* lock= &sync_lock[lock_id];
+  struct peterson_lock* lock= &sync_lock[lock_id];
   lock->b[role]=1;
   lock->turn=role;
-  await (lock->b[1-role]=0 || lock->turn=1-role);
+  await (lock->b[1-role] == 0 || lock->turn=1-role);
 }
 
 int peterson_release(int lock_id, int role){
-  peterson_lock* lock= &sync_lock[lock_id];
+  struct peterson_lock* lock= &sync_lock[lock_id];
   lock->b[role]=0;
 }
 

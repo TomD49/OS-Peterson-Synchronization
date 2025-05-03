@@ -106,8 +106,9 @@ struct proc {
   char name[16];               // Process name (debugging)
 };
 
-typedef struct peterson_lock peterson_lock{
+struct peterson_lock{
   int lockid;
+  int active;
   uint turn;
   uint b[2];
 };
