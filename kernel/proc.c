@@ -705,11 +705,13 @@ procdump(void)
 
 int peterson_create(void){ //how to init a lock?
   struct peterson_lock *p;
+  int lockid;
   int found=0;
   acquire(&peterson_array_lock);
   for(p = peterson_locks; p < &peterson_locks[NLOCKS] && !found ; p++) { //check for available locks in the array
     if(p->active == 0) {
       p->lockid = nextlockid;
+      lockid = p->lockid;
       printf("%d\n",p->lockid);
       nextlockid++;
       p->active=1;
@@ -720,7 +722,7 @@ int peterson_create(void){ //how to init a lock?
   if(!found){
     return -1;
   }
-  return p->lockid;
+  return lockid;
 }
 
 int peterson_acquire(int lock_id, int role){
