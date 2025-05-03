@@ -130,6 +130,10 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_peterson_create] sys_peterson_create,
+[SYS_peterson_acquire] sys_peterson_acquire,
+[SYS_peterson_release] sys_peterson_release,
+[SYS_peterson_destroy] sys_peterson_destroy,
 };
 
 void

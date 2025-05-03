@@ -10,14 +10,14 @@ struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
 
-struct peterson_lock sync_lock[NLOCKS];
+struct peterson_lock peterson_locks[NLOCKS];
 
 struct proc *initproc;
 
 int nextpid = 1;
 int nextlockid = 0;
 struct spinlock pid_lock;
-struct spinlock lockid_lock;
+struct spinlock peterson_array_lock;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
@@ -67,14 +67,14 @@ void
 initPetersonLocks(void)
 {
   int i = 0;
-  struct peterson_lock *plock = sync_lock;
+  struct peterson_lock *plock = peterson_locks;
 
   for (i = 0; i < NLOCKS; i++) {
     plock->turn = 0;
     plock->active = 0;
     plock->b[0] = 0;
     plock->b[1] = 0;
-    plock->lockid = i;
+    plock->lockid = -1;
     plock++;
   }
 }
@@ -704,33 +704,53 @@ procdump(void)
 }
 
 int peterson_create(void){ //how to init a lock?
-  int lock_id;
-  
-  acquire(&lockid_lock);
-  lock_id = nextlockid;
-  sync_lock[lock_id].active = 1;
-  if (lock_id >= NLOCKS) {
-    release(&lockid_lock);
-    return -1; // No more locks available
+  struct peterson_lock *p;
+  int found=0;
+  acquire(&peterson_array_lock);
+  for(p = peterson_locks; p < &peterson_locks[NLOCKS] && !found ; p++) { //check for available locks in the array
+    if(p->active == 0) {
+      p->lockid = nextlockid;
+      printf("%d\n",p->lockid);
+      nextlockid++;
+      p->active=1;
+      found=1;
+    }
   }
-  nextlockid = nextlockid + 1;
-  release(&lockid_lock);
-
-  return lock_id;
+  release(&peterson_array_lock);
+  if(!found){
+    return -1;
+  }
+  return p->lockid;
 }
 
 int peterson_acquire(int lock_id, int role){
-  struct peterson_lock* lock= &sync_lock[lock_id];
+  if(lock_id<0 || lock_id>=NLOCKS || role<0 || role>1){
+    return -1;
+  }
+  struct peterson_lock* lock= &peterson_locks[lock_id];
   lock->b[role]=1;
   lock->turn=role;
-  await (lock->b[1-role] == 0 || lock->turn=1-role);
+  while(lock->b[1-role] == 1 && lock->turn==role){
+    yield();
+  }
+  return 0;
 }
 
 int peterson_release(int lock_id, int role){
-  struct peterson_lock* lock= &sync_lock[lock_id];
+  if(lock_id<0 || lock_id>=NLOCKS || role<0 || role>1){
+    return -1;
+  }
+  struct peterson_lock* lock= &peterson_locks[lock_id];
   lock->b[role]=0;
+  return 0;
 }
 
 int peterson_destroy(int lock_id){
-
+  if(lock_id<0 || lock_id>=NLOCKS){
+    return -1;
+  }
+  acquire(&peterson_array_lock);
+  peterson_locks[lock_id].active = 0;
+  release(&peterson_array_lock);
+  return 0;
 }
