@@ -64,7 +64,7 @@ procinit(void)
 
 // initialize the peterson locks.
 void
-initPetersonLocks(void)
+petersonLocksInit(void)
 {
   int i = 0;
   struct peterson_lock *plock = peterson_locks;
@@ -703,10 +703,11 @@ procdump(void)
   }
 }
 
-int peterson_create(void){ //how to init a lock?
+int peterson_create(void){
   struct peterson_lock *p;
   int lockid;
   int found=0;
+  printf("peterson_create\n");
   acquire(&peterson_array_lock);
   for(p = peterson_locks; p < &peterson_locks[NLOCKS] && !found ; p++) { //check for available locks in the array
     if(p->active == 0) {
@@ -726,10 +727,15 @@ int peterson_create(void){ //how to init a lock?
 }
 
 int peterson_acquire(int lock_id, int role){
-  if(lock_id<0 || lock_id>=NLOCKS || role<0 || role>1){
+
+  if(lock_id<0 || role<0 || role>1){ //consider handling the case when lock_id is greater than NLOCKS
     return -1;
   }
-  struct peterson_lock* lock= &peterson_locks[lock_id];
+  printf("peterson_acquire\n");
+  struct peterson_lock* lock= get_lock(lock_id);
+  if(!lock || lock->active == 0){
+    return -1;
+  }
   lock->b[role]=1;
   lock->turn=role;
   while(lock->b[1-role] == 1 && lock->turn==role){
@@ -739,20 +745,41 @@ int peterson_acquire(int lock_id, int role){
 }
 
 int peterson_release(int lock_id, int role){
-  if(lock_id<0 || lock_id>=NLOCKS || role<0 || role>1){
+
+  if(lock_id<0 || role<0 || role>1){ //consider handling the case when lock_id is greater than NLOCKS
     return -1;
   }
-  struct peterson_lock* lock= &peterson_locks[lock_id];
+  printf("peterson_release\n");
+  struct peterson_lock* lock= get_lock(lock_id);
+  if(!lock || lock->active == 0){//consider adding a lock for each lock
+    return -1;
+  }
   lock->b[role]=0;
   return 0;
 }
 
 int peterson_destroy(int lock_id){
-  if(lock_id<0 || lock_id>=NLOCKS){
+  if(lock_id<0 ){ //consider handling the case when lock_id is greater than NLOCKS
+    return -1;
+  }
+  printf("peterson_destroy\n");
+  struct peterson_lock* lock= get_lock(lock_id);
+  if(!lock || lock->active == 0){//consider adding a lock for each lock
     return -1;
   }
   acquire(&peterson_array_lock);
-  peterson_locks[lock_id].active = 0;
+  lock->active = 0;
+  release(&peterson_array_lock);
+  return 0;
+}
+
+struct peterson_lock* get_lock(int lock_id){//maybe improve this function to not use a loop
+  acquire(&peterson_array_lock);
+  for (int i = 0; i < NLOCKS; i++){
+    if(peterson_locks[i].lockid == lock_id){
+      return &peterson_locks[i];
+    }
+  }
   release(&peterson_array_lock);
   return 0;
 }
