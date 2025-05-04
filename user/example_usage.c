@@ -14,17 +14,24 @@ main(int argc, char *argv[])
         }
         int fork_ret = fork();
         int role = fork_ret > 0 ? 0 : 1;
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 2; i++) {
             if (peterson_acquire(lock_id, role) < 0) {
                 printf("Failed to acquire lock\n");
                 exit(1);
             }
             // Critical section
             if (role == 0){
-                printf("Parent process in critical section\n");
-                printf("lock id is: %d\n",lock_id);
+                //printf("Parent process in critical section\n");
+                if (peterson_destroy(lock_id) < 0) {
+                    printf("Parent failed to destroy lock\n");
+                }
             }
-            else printf("Child process in critical section\n");
+            else{
+                //printf("Child process in critical section\n");
+                if (peterson_destroy(lock_id) < 0) {
+                    printf("Child failed to destroy lock\n");
+                }
+            } 
             if (peterson_release(lock_id, role) < 0) {
                 printf("Failed to release lock\n");
                 exit(1);

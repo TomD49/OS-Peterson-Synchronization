@@ -763,6 +763,7 @@ int peterson_acquire(int lock_id, int role){
     release(&p->lock);
     return -1;
   }
+  p->isUsed = 1;
   release(&p->lock);
 
   return 0;
