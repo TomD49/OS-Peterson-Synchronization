@@ -110,6 +110,7 @@ struct peterson_lock{
   struct spinlock lock;
   int lockid;
   int active;
+  int isUsed;
   uint turn;
   uint b[2];
 };

@@ -19,7 +19,7 @@ main(int argc, char *argv[])
                 printf("Failed to acquire lock\n");
                 exit(1);
             }
-                // Critical section
+            // Critical section
             if (role == 0){
                 printf("Parent process in critical section\n");
                 printf("lock id is: %d\n",lock_id);

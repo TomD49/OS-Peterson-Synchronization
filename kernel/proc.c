@@ -15,9 +15,7 @@ struct peterson_lock peterson_locks[NLOCKS];
 struct proc *initproc;
 
 int nextpid = 1;
-int nextlockid = 0;
 struct spinlock pid_lock;
-struct spinlock peterson_array_lock;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
@@ -74,7 +72,8 @@ petersonLocksInit(void)
     plock->active = 0;
     plock->b[0] = 0;
     plock->b[1] = 0;
-    plock->lockid = -1;
+    plock->lockid = i;
+    plock->isUsed = 0;
     plock++;
   }
 }
@@ -707,24 +706,17 @@ int peterson_create(void){
   struct peterson_lock *p;
   int lockid;
   int found=0;
-  printf("peterson_create\n");
-  //acquire(&peterson_array_lock);
+  //printf("peterson_create\n");
   for(p = peterson_locks; p < &peterson_locks[NLOCKS] && !found ; p++) { //check for available locks in the array
-    acquire(&p->lock);
-    if(p->active == 0) {
-      acquire(&peterson_array_lock);
-      p->lockid = nextlockid;
-      lockid = p->lockid;
-      printf("%d\n",p->lockid);
-      nextlockid++;
-      release(&peterson_array_lock);
-      p->active=1;
+    //acquire(&p->lock);
+    if(__sync_lock_test_and_set(&p->active, 1)==0){
       found=1;
+      lockid = p->lockid;
     }
-    release(&p->lock);
+    //release(&p->lock);
   }
-  //release(&peterson_array_lock);
   if(!found){
+    printf("No available locks\n");
     return -1;
   }
   return lockid;
@@ -732,17 +724,19 @@ int peterson_create(void){
 
 int peterson_acquire(int lock_id, int role){
 
-  if(lock_id<0 || role<0 || role>1){ //consider handling the case when lock_id is greater than NLOCKS
+  if(lock_id<0 || role<0 || role>1){ 
     return -1;
   }
-  printf("peterson_acquire\n");
-  struct peterson_lock* p= get_lock(lock_id);
+  //printf("peterson_acquire\n");
+  struct peterson_lock* p = get_lock(lock_id);
   if(!p){
     return -1;
   }
+
   acquire(&p->lock);
   if(!p->active){
     release(&p->lock);
+    printf("Lock is not active\n");
     return -1;
   }
   release(&p->lock);
@@ -752,56 +746,85 @@ int peterson_acquire(int lock_id, int role){
   while(p->b[1-role] == 1 && p->turn==role){
     yield();
   }
+  
   acquire(&p->lock);
-    if(p->lockid && p->active){
-      
-    }
+  if(p->active == 0) {
+    printf("lock has been destroyed\n");
+    release(&p->lock);
+    return -1;
+  }
+  if(p->lockid != lock_id) {
+    printf("lock id mismatch\n");
+    release(&p->lock);
+    return -1;
+  }
+  if (p->isUsed == 1){
+    printf("Unexpected error: lock is in use\n");
+    release(&p->lock);
+    return -1;
+  }
+  release(&p->lock);
+
   return 0;
 }
 
 int peterson_release(int lock_id, int role){
 
-  if(lock_id<0 || role<0 || role>1){ //consider handling the case when lock_id is greater than NLOCKS
+  if(lock_id<0 || role<0 || role>1){ 
     return -1;
   }
-  printf("peterson_release\n");
-  struct peterson_lock* lock= get_lock(lock_id);
-  if(!lock || lock->active == 0){//consider adding a lock for each lock
+  //printf("peterson_release\n");
+  struct peterson_lock* p= get_lock(lock_id);
+  if(!p){
     return -1;
   }
-  lock->b[role]=0;
+  acquire(&p->lock);
+  if(!p->active){
+    release(&p->lock);
+    printf("Lock is not active\n");
+    return -1;
+  }
+  release(&p->lock);
+
+  p->b[role] = 0;
+
+  acquire(&p->lock);
+  p->isUsed = 0;
+  release(&p->lock);
+
   return 0;
 }
 
 int peterson_destroy(int lock_id){
-  if(lock_id<0 ){ //consider handling the case when lock_id is greater than NLOCKS
+  if(lock_id<0 ){ 
     return -1;
   }
-  printf("peterson_destroy\n");
-  struct peterson_lock* lock= get_lock(lock_id);
-  if(!lock || lock->active == 0){//consider adding a lock for each lock
+  //printf("peterson_destroy\n");
+  struct peterson_lock* p = get_lock(lock_id);
+  if(!p){//consider adding a lock for each lock
     return -1;
   }
-  acquire(&peterson_array_lock);
-  lock->active = 0;
-  release(&peterson_array_lock);
+  acquire(&p->lock);
+  if(!p->active){
+    release(&p->lock);
+    printf("Lock is not active\n");
+    return -1;
+  }
+  if(p->isUsed == 1){
+    release(&p->lock);
+    printf("Lock is in use\n");
+    return -1;
+  }
+  p->isUsed = 1;
+  p->active = 0;
+  p->lockid = p->lockid + NLOCKS; //mark the lock as destroyed by changing its id
+  release(&p->lock);
+
   return 0;
 }
 
-struct peterson_lock* get_lock(int lock_id){//maybe improve this function to not use a loop
-  //acquire(&peterson_array_lock);
-  struct peterson_lock *p;
-  int found=0;
-  printf("get_lock\n");
-  //acquire(&peterson_array_lock);
-  for(p = peterson_locks; p < &peterson_locks[NLOCKS] && !found ; p++){
-    acquire(&p->lock);
-    if(p->lockid == lock_id){
-      release(&p->lock);
-      return p;
-    }
-    release(&p->lock);
-  }
-  //release(&peterson_array_lock);
-  return 0;
+struct peterson_lock* get_lock(int lock_id){
+  int lock_index = lock_id % NLOCKS;
+  struct peterson_lock* p = &peterson_locks[lock_index];
+  return p;
 }
