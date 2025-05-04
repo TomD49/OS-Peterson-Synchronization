@@ -107,6 +107,7 @@ struct proc {
 };
 
 struct peterson_lock{
+  struct spinlock lock;
   int lockid;
   int active;
   uint turn;

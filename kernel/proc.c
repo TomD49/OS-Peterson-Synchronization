@@ -708,18 +708,22 @@ int peterson_create(void){
   int lockid;
   int found=0;
   printf("peterson_create\n");
-  acquire(&peterson_array_lock);
+  //acquire(&peterson_array_lock);
   for(p = peterson_locks; p < &peterson_locks[NLOCKS] && !found ; p++) { //check for available locks in the array
+    acquire(&p->lock);
     if(p->active == 0) {
+      acquire(&peterson_array_lock);
       p->lockid = nextlockid;
       lockid = p->lockid;
       printf("%d\n",p->lockid);
       nextlockid++;
+      release(&peterson_array_lock);
       p->active=1;
       found=1;
     }
+    release(&p->lock);
   }
-  release(&peterson_array_lock);
+  //release(&peterson_array_lock);
   if(!found){
     return -1;
   }
@@ -732,15 +736,26 @@ int peterson_acquire(int lock_id, int role){
     return -1;
   }
   printf("peterson_acquire\n");
-  struct peterson_lock* lock= get_lock(lock_id);
-  if(!lock || lock->active == 0){
+  struct peterson_lock* p= get_lock(lock_id);
+  if(!p){
     return -1;
   }
-  lock->b[role]=1;
-  lock->turn=role;
-  while(lock->b[1-role] == 1 && lock->turn==role){
+  acquire(&p->lock);
+  if(!p->active){
+    release(&p->lock);
+    return -1;
+  }
+  release(&p->lock);
+  
+  p->b[role]=1;
+  p->turn=role;
+  while(p->b[1-role] == 1 && p->turn==role){
     yield();
   }
+  acquire(&p->lock);
+    if(p->lockid && p->active){
+      
+    }
   return 0;
 }
 
@@ -774,12 +789,19 @@ int peterson_destroy(int lock_id){
 }
 
 struct peterson_lock* get_lock(int lock_id){//maybe improve this function to not use a loop
-  acquire(&peterson_array_lock);
-  for (int i = 0; i < NLOCKS; i++){
-    if(peterson_locks[i].lockid == lock_id){
-      return &peterson_locks[i];
+  //acquire(&peterson_array_lock);
+  struct peterson_lock *p;
+  int found=0;
+  printf("get_lock\n");
+  //acquire(&peterson_array_lock);
+  for(p = peterson_locks; p < &peterson_locks[NLOCKS] && !found ; p++){
+    acquire(&p->lock);
+    if(p->lockid == lock_id){
+      release(&p->lock);
+      return p;
     }
+    release(&p->lock);
   }
-  release(&peterson_array_lock);
+  //release(&peterson_array_lock);
   return 0;
 }
