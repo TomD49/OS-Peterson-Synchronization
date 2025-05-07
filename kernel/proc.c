@@ -781,17 +781,19 @@ int peterson_release(int lock_id, int role){
   }
   acquire(&p->lock);
   if(!p->active){
+    p->isUsed = 0;
     release(&p->lock);
     printf("Lock is not active\n");
     return -1;
   }
+  p->isUsed = 0;
   release(&p->lock);
 
   p->b[role] = 0;
 
-  acquire(&p->lock);
-  p->isUsed = 0;
-  release(&p->lock);
+  //acquire(&p->lock);
+  //p->isUsed = 0;
+  //release(&p->lock);
 
   return 0;
 }
@@ -806,9 +808,9 @@ int peterson_destroy(int lock_id){
     return -1;
   }
   acquire(&p->lock);
-  if(!p->active){
+  if(!p->active || p->lockid!=lock_id){
     release(&p->lock);
-    printf("Lock is not active\n");
+    printf("Lock doesn't exist\n");
     return -1;
   }
   if(p->isUsed == 1){
@@ -816,7 +818,7 @@ int peterson_destroy(int lock_id){
     printf("Lock is in use\n");
     return -1;
   }
-  p->isUsed = 1;
+  //p->isUsed = 1;
   p->active = 0;
   p->lockid = p->lockid + NLOCKS; //mark the lock as destroyed by changing its id
   release(&p->lock);
